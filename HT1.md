@@ -73,3 +73,51 @@ db.news.createIndex({Content: "text"})
 ```
 
 Монга шебуршала минут 15, после чего просто упала. Видимо слишком много контента для нее, не потянула =)
+
+Попробуем создать текстовый индекс на более простом поле (так меньше текста):
+```
+db.news.createIndex({Summary: "text"})
+```
+
+Этот индекс создался успешно. 
+
+Посмотрим на то, какие индексы для этой коллекции уже заведены:
+
+```
+data> db.news.getIndexes()
+[
+  { v: 2, key: { _id: 1 }, name: '_id_' },
+  { v: 2, key: { ID: 1 }, name: 'ID_1' },
+  {
+    v: 2,
+    key: { _fts: 'text', _ftsx: 1 },
+    name: 'Summary_text',
+    weights: { Summary: 1 },
+    default_language: 'english',
+    language_override: 'language',
+    textIndexVersion: 3
+  }
+]
+```
+
+Видим тут наш новый индекс, который завелся для поля Summary на базе английского языка. 
+
+Запустим поиск тех новостей, у которых Summary подходит под регулярку `/police.*people.*crime/`:
+```
+db.news.find({Summary: /police.*people.*crime/ }).limit(5)
+```
+
+Поиск отработал примерно моментально. 
+
+Теперь удалим индекс:
+```
+db.news.dropIndex('Summary_text')
+```
+
+
+Попробуем поискать без него:
+```
+db.news.find({Summary: /police.*people.*crime/ }).limit(5)
+```
+
+Поиск был очень долгим, я даже не смог дождаться результата его работы...
