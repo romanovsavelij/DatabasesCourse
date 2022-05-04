@@ -84,6 +84,16 @@ fdb> set student_124_dbmark 7
 Committed (12201329183)
 fdb> get student_123_name
 `student_123_name' is `Saveliy'
+fdb> set student_125_name Saveliy
+Committed (21245107540)
+fdb> set student_125_surname Petrov
+Committed (21256512895)
+fdb> getrange student_123 student_123_\xFF
+
+Range limited to 25 keys
+`student_123_dbmark' is `10'
+`student_123_name' is `Saveliy'
+`student_123_surname' is `Romanov'
 ```
 
 ### Распределение файлов БД по разным носителям?
@@ -107,7 +117,41 @@ fdb> get student_123_name
 Индексы не поддерживаются "из коробки", в FoundationDB они реализуются по модели "сделай сам". Благо, ACID транзакции значительно упрощают
 обработку concurrency в кейсе, когда надо изменить данные и поменять все соответствующие индексы атомарно. 
 
-TODO: создание индекса
+```sh
+fdb> set student_name_Saveliy_123 ""
+Committed (21307570403)
+fdb> set student_name_Saveliy_125 ""
+Committed (21311785572)
+fdb> getrange student_name_Saveliy student_name_Saveliy_\xFF
+
+Range limited to 25 keys
+`student_name_Saveliy_123' is `'
+`student_name_Saveliy_125' is `'
+```
+
+Пример кода работы с индексом из статьи в доке: 
+```python
+user = fdb.Subspace(('user',))
+index = fdb.Subspace(('zipcode_index',))
+
+@fdb.transactional
+def set_user(tr, ID, name, zipcode):
+        tr[user[ID][zipcode]] = name
+        tr[index[zipcode][ID]] = ''
+
+# Normal lookup
+@fdb.transactional
+def get_user(tr, ID):
+    for k,v in tr[user[ID].range()]:
+        return v
+
+    return None
+
+# Index lookup
+@fdb.transactional
+def get_user_IDs_in_region(tr, zipcode):
+    return [index.unpack(k)[1] for k, _ in tr[index[zipcode].range()]]
+```
 
 ### Как строится процесс выполнения запросов в вашей СУБД?
 
@@ -139,7 +183,9 @@ TODO: создание индекса
 
 ### Какие методы восстановления поддерживаются в вашей СУБД. Расскажите о них.
 
-
+FoundationDB умеет восстанавливаться после ошибок любого типа. Для нее специально написан детерменированный симулятор распределенной системы, 
+на котором она ежедневно тестируется на миллионах симуляций со всевозможными отказами разных компонентов системы. 
+Поэтому, ее отказоустойчивости можно доверять =)
 
 ### Расскажите про шардинг в вашей конкретной СУБД. Какие типы используются? Принцип работы.
 
@@ -149,7 +195,7 @@ TODO: создание индекса
 
 ### Возможно ли применить термины Data Mining, Data Warehousing и OLAP в вашей СУБД?
 
-
+Это база не заточена под аналитические задачи. Она оптимизирована под большой throughput входящих запросов, а не под аналитические нужды. 
 
 ### Какие методы защиты поддерживаются вашей СУБД? Шифрование трафика, модели авторизации и т.п.
 
